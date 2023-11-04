@@ -1,17 +1,19 @@
 const express = require('express');
 const morgan = require('morgan');
-const cookieParser = require('cookie-parser');
+// const cookieParser = require('cookie-parser');
+const bcrypt = require('bcryptjs');
+const cookieSession = require('cookie-session');
 
 const users = {
   abc: {
     id: "abc",
     email: "a@a.com",
-    password: "1234",
+    password: "$2a$10$CGioC7f7YtKHuBJvbFjZT.9uXLGgHCI86bDa.T/AVHoxgpQDi9fjq",
   },
   def: {
     id: "def",
     email: "b@b.com",
-    password: "5678",
+    password: "$2a$10$fGvSklhQh6X8z.5nTCpeU.YnlIVa0LBUBW83I03yx1S7lLUjFutAW",
   },
 };
 
@@ -23,7 +25,11 @@ app.set('view engine', 'ejs');
 
 // middleware
 app.use(morgan('dev'));
-app.use(cookieParser()); // populates req.cookies
+// app.use(cookieParser()); // populates req.cookies
+app.use(cookieSession({
+  name: 'my-cookie',
+  keys: [1, 2, 3]
+}))
 app.use(express.urlencoded({ extended: false })); // populates req.body
 app.use(express.static('public'));
 
@@ -64,7 +70,7 @@ app.post('/register', (req, res) => {
   const newUser = {
     id: id,
     email: email,
-    password: password
+    password: bcrypt.hashSync(password, 10)
   };
 
   // add the new user to the users object
@@ -110,13 +116,14 @@ app.post('/login', (req, res) => {
   }
 
   // does the provided password NOT match the one from the database
-  if (foundUser.password !== password) {
+  if (!bcrypt.compareSync(password, foundUser.password)) {
     return res.status(400).send('passwords do not match');
   }
 
   // happy path! The user is who they say they are!
   // set a cookie and redirect the user
-  res.cookie('userId', foundUser.id);
+  // res.cookie('userId', foundUser.id);
+  req.session.userId = foundUser.id;
 
   res.redirect('/protected');
 });
@@ -124,7 +131,8 @@ app.post('/login', (req, res) => {
 // GET /protected
 app.get('/protected', (req, res) => {
   // do they have a cookie?
-  const userId = req.cookies.userId;
+  // const userId = req.cookies.userId;
+  const userId = req.session.userId;
 
   if (!userId) {
     return res.status(401).send('you must be logged in to see this page');
@@ -144,7 +152,9 @@ app.get('/protected', (req, res) => {
 // POST /logout
 app.post('/logout', (req, res) => {
   // clear the userId cookie
-  res.clearCookie('userId');
+  // res.clearCookie('userId');
+  // req.session.userId = null;
+  req.session = null;
 
   // redirect the user
   res.redirect('/login');
